@@ -14,6 +14,8 @@
 - Avoid duplicated logic, unnecessary abstractions, unused imports, dead code, and unrelated refactoring.
 - Validate external input and handle expected failures explicitly.
 - Keep exception handling narrow and provide actionable error messages.
+- Use lazy `%s`-style formatting for logging calls (e.g. `_LOGGER.debug("Received %s", value)`); do not interpolate values with f-strings in logging calls.
+- Use timezone-aware datetimes (e.g., `datetime.now(timezone.utc)`) for timestamps.
 - Never log credentials, tokens, personal data, or other secrets.
 
 ## Testing and verification
