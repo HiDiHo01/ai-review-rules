@@ -32,8 +32,8 @@ Apply these rules to all changes and pull-request reviews in this repository.
 - Use snake_case for variables and functions.
 - Add meaningful docstrings to functions and methods.
 - Avoid unused imports, mutable default arguments, and broad exception handling.
-- Use lazy `%s`-style formatting for logging calls, for example `_LOGGER.debug("Received %s", value)`.
-- Use timezone-aware datetimes.
+- Use lazy `%s`-style formatting for logging calls (e.g. `_LOGGER.debug("Received %s", value)`); do not interpolate values with f-strings in logging calls.
+- Use timezone-aware datetimes (e.g., `datetime.now(timezone.utc)`) for timestamps.
 - Do not claim tests or checks passed unless their execution is confirmed.
 
 ## Safety

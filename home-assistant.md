@@ -27,7 +27,8 @@ Use these additional rules when working on a Home Assistant custom integration. 
 - Add docstrings to functions and methods.
 - Prefix class-internal helper methods with an underscore when they are not public API.
 - Use timezone-aware datetimes and `datetime.now(timezone.utc)` for UTC timestamps.
-- Use lazy percent-style logging; do not interpolate values with f-strings in logging calls.
+- Use lazy `%s`-style formatting for logging calls (e.g. `_LOGGER.debug("Received %s", value)`); do not interpolate values with f-strings in logging calls.
+- Never log credentials, tokens, personal data, or other secrets.
 - Validate API responses before using them and provide useful, sanitized error messages.
 - Avoid `Any` in internal helpers when a more precise type or `object` is suitable; use Home Assistant's required public types where necessary.
 
