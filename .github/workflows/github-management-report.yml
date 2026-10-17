@@ -1,0 +1,29 @@
+name: GitHub portfolio management report
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-portfolio-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Generate read-only portfolio report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Generate report
+        env:
+          GITHUB_MANAGEMENT_TOKEN: ${{ secrets.GITHUB_MANAGEMENT_TOKEN }}
+          GITHUB_MANAGEMENT_OWNER: HiDiHo01
+          GITHUB_MANAGEMENT_STALE_DAYS: "30"
+        run: python3 scripts/github_management_report.py
