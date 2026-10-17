@@ -1,7 +1,5 @@
 """Generate a read-only GitHub portfolio report for HiDiHo01 repositories."""
 
-from __future__ import annotations
-
 import json
 import os
 import sys
