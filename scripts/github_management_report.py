@@ -8,7 +8,6 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-
 API_ROOT = "https://api.github.com"
 OWNER = os.environ.get("GITHUB_MANAGEMENT_OWNER", "HiDiHo01")
 STALE_DAYS = int(os.environ.get("GITHUB_MANAGEMENT_STALE_DAYS", "30"))
@@ -19,7 +18,13 @@ class GitHubApiError(RuntimeError):
     """Represent a failed GitHub API request."""
 
 
-def github_request(path: str, *, params: dict[str, str] | None = None, method: str = "GET", payload: dict[str, object] | None = None) -> object:
+def github_request(
+    path: str,
+    *,
+    params: dict[str, str] | None = None,
+    method: str = "GET",
+    payload: dict[str, object] | None = None,
+) -> object:
     """Send an authenticated request to the GitHub REST or GraphQL API."""
     if not TOKEN:
         raise GitHubApiError(
@@ -63,47 +68,105 @@ def fetch_all_pages(path: str, *, params: dict[str, str]) -> list[dict[str, obje
         page_params = {**params, "per_page": "100", "page": str(page)}
         result = github_request(path, params=page_params)
         if not isinstance(result, list):
-            raise GitHubApiError(f"Expected a list from {path}, got {type(result).__name__}.")
+            raise GitHubApiError(
+                f"Expected a list from {path}, got {type(result).__name__}."
+            )
         records.extend(item for item in result if isinstance(item, dict))
         if len(result) < 100:
             return records
         page += 1
 
 
+def _get_projects_connection(response: object) -> dict[str, object]:
+    """Extract the project connection or raise an actionable GraphQL error."""
+    if not isinstance(response, dict):
+        raise GitHubApiError("GitHub GraphQL returned an unexpected response.")
+
+    errors = response.get("errors")
+    if errors:
+        error_items = errors if isinstance(errors, list) else []
+        messages = [
+            error["message"]
+            for error in error_items
+            if isinstance(error, dict)
+            and isinstance(error.get("message"), str)
+            and error["message"].strip()
+        ]
+        raise GitHubApiError("; ".join(messages) or "GitHub GraphQL returned an error.")
+
+    data = response.get("data")
+    viewer = data.get("viewer") if isinstance(data, dict) else None
+    connection = viewer.get("projectsV2") if isinstance(viewer, dict) else None
+    if not isinstance(connection, dict):
+        raise GitHubApiError(
+            "GitHub GraphQL response did not contain viewer project data."
+        )
+    return connection
+
+
+def _parse_projects_page(
+    response: object,
+) -> tuple[list[dict[str, object]], str | None]:
+    """Validate one project page and return its next cursor, or None when complete."""
+    connection = _get_projects_connection(response)
+    nodes = connection.get("nodes")
+    if not isinstance(nodes, list) or any(not isinstance(node, dict) for node in nodes):
+        raise GitHubApiError("GitHub GraphQL returned an invalid project list.")
+
+    page_info = connection.get("pageInfo")
+    if not isinstance(page_info, dict) or not isinstance(
+        page_info.get("hasNextPage"), bool
+    ):
+        raise GitHubApiError("GitHub GraphQL returned invalid project pagination data.")
+    if not page_info["hasNextPage"]:
+        return nodes, None
+
+    next_cursor = page_info.get("endCursor")
+    if not isinstance(next_cursor, str) or not next_cursor.strip():
+        raise GitHubApiError("GitHub GraphQL returned an invalid next-page cursor.")
+    return nodes, next_cursor
+
+
 def fetch_projects() -> tuple[list[dict[str, object]], str | None]:
-    """Fetch projects owned by the authenticated GitHub user when permitted."""
+    """Fetch every project page, retaining valid earlier pages with any warning."""
     query = """
-    query {
+    query($cursor: String) {
       viewer {
         login
-        projectsV2(first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        projectsV2(
+          first: 100, after: $cursor,
+          orderBy: {field: UPDATED_AT, direction: DESC}
+        ) {
           nodes { title url closed updatedAt }
-          pageInfo { hasNextPage }
+          pageInfo { hasNextPage endCursor }
         }
       }
     }
     """
-    try:
-        result = github_request("/graphql", method="POST", payload={"query": query})
-    except GitHubApiError as err:
-        return [], str(err)
+    projects: list[dict[str, object]] = []
+    cursor: str | None = None
+    seen_cursors: set[str] = set()
 
-    if not isinstance(result, dict):
-        return [], "GitHub GraphQL returned an unexpected response."
-    errors = result.get("errors")
-    data = result.get("data")
-    if errors:
-        message = "; ".join(
-            str(error.get("message", "unknown GraphQL error"))
-            for error in errors
-            if isinstance(error, dict)
-        )
-        return [], message or "GitHub GraphQL returned an error."
-    if not isinstance(data, dict) or not isinstance(data.get("viewer"), dict):
-        return [], "GitHub GraphQL response did not contain viewer project data."
-    projects = data["viewer"].get("projectsV2", {})
-    nodes = projects.get("nodes", []) if isinstance(projects, dict) else []
-    return [item for item in nodes if isinstance(item, dict)], None
+    while True:
+        try:
+            response = github_request(
+                "/graphql",
+                method="POST",
+                payload={"query": query, "variables": {"cursor": cursor}},
+            )
+            page_projects, next_cursor = _parse_projects_page(response)
+            if next_cursor is not None and next_cursor in seen_cursors:
+                raise GitHubApiError(
+                    "GitHub GraphQL repeated a project pagination cursor."
+                )
+        except GitHubApiError as err:
+            return projects, str(err)
+
+        projects.extend(page_projects)
+        if next_cursor is None:
+            return projects, None
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
 
 
 def markdown_escape(value: object) -> str:
@@ -123,7 +186,8 @@ def main() -> int:
         return 1
 
     eligible_repos = [
-        repo for repo in repos
+        repo
+        for repo in repos
         if repo.get("owner", {}).get("login", "").casefold() == OWNER.casefold()
         and not repo.get("fork", False)
         and not repo.get("archived", False)
@@ -152,10 +216,7 @@ def main() -> int:
             continue
 
         actual_issues = [issue for issue in issues if "pull_request" not in issue]
-        unassigned = [
-            issue for issue in actual_issues
-            if not issue.get("assignees")
-        ]
+        unassigned = [issue for issue in actual_issues if not issue.get("assignees")]
         stale = []
         for issue in actual_issues:
             updated_at = issue.get("updated_at")
@@ -169,40 +230,57 @@ def main() -> int:
                 stale.append(issue)
 
         no_milestone = [issue for issue in actual_issues if not issue.get("milestone")]
-        repository_rows.append((
-            full_name, len(actual_issues), len(unassigned), len(stale), len(no_milestone)
-        ))
+        repository_rows.append(
+            (
+                full_name,
+                len(actual_issues),
+                len(unassigned),
+                len(stale),
+                len(no_milestone),
+            )
+        )
 
         for issue in unassigned[:25]:
-            unassigned_rows.append((
-                full_name,
-                int(issue.get("number", 0)),
-                str(issue.get("title", "")),
-                str(issue.get("html_url", "")),
-            ))
+            unassigned_rows.append(
+                (
+                    full_name,
+                    int(issue.get("number", 0)),
+                    str(issue.get("title", "")),
+                    str(issue.get("html_url", "")),
+                )
+            )
         for issue in stale[:25]:
-            stale_rows.append((
-                full_name,
-                int(issue.get("number", 0)),
-                str(issue.get("title", "")),
-                str(issue.get("updated_at", ""))[:10],
-                str(issue.get("html_url", "")),
-            ))
+            stale_rows.append(
+                (
+                    full_name,
+                    int(issue.get("number", 0)),
+                    str(issue.get("title", "")),
+                    str(issue.get("updated_at", ""))[:10],
+                    str(issue.get("html_url", "")),
+                )
+            )
         for milestone in milestones:
-            milestone_rows.append((
-                full_name,
-                str(milestone.get("title", "")),
-                str(milestone.get("state", "")),
-                int(milestone.get("open_issues", 0)),
-                str(milestone.get("due_on") or "No due date")[:10],
-            ))
+            milestone_rows.append(
+                (
+                    full_name,
+                    str(milestone.get("title", "")),
+                    str(milestone.get("state", "")),
+                    int(milestone.get("open_issues", 0)),
+                    str(milestone.get("due_on") or "")[:10] or "No due date",
+                )
+            )
 
     projects, project_error = fetch_projects()
+    project_summary = f"**{len(projects)}**"
+    if project_error:
+        project_summary = (
+            f"**{len(projects)}** (incomplete)" if projects else "**unavailable**"
+        )
     lines = [
         f"# GitHub portfolio report — {OWNER}",
         "",
         f"- Generated: {now.isoformat(timespec='seconds')}",
-        f"- Scope: owned repositories only; forks and archived repositories excluded.",
+        "- Scope: owned repositories only; forks and archived repositories excluded.",
         f"- Stale threshold: issues not updated in {STALE_DAYS} days.",
         "- Mode: read-only. No issues, milestones, assignees, labels, or projects were changed.",
         "",
@@ -213,7 +291,7 @@ def main() -> int:
         f"- Unassigned issues: **{sum(row[2] for row in repository_rows)}**.",
         f"- Stale issues: **{sum(row[3] for row in repository_rows)}**.",
         f"- Open issues without a milestone: **{sum(row[4] for row in repository_rows)}**.",
-        f"- User-owned Projects v2 found: **{len(projects)}**.",
+        f"- User-owned Projects v2 found: {project_summary}.",
         "",
         "## Repository workload",
         "",
@@ -224,41 +302,85 @@ def main() -> int:
         f"| {markdown_escape(name)} | {open_count} | {unassigned} | {stale} | {no_milestone} |"
         for name, open_count, unassigned, stale, no_milestone in repository_rows
     )
-    lines.extend(["", "## Milestones", "", "| Repository | Milestone | State | Open issues | Due date |", "|---|---|---|---:|---|"])
+    lines.extend(
+        [
+            "",
+            "## Milestones",
+            "",
+            "| Repository | Milestone | State | Open issues | Due date |",
+            "|---|---|---|---:|---|",
+        ]
+    )
     lines.extend(
         f"| {markdown_escape(repo)} | {markdown_escape(title)} | {state} | {open_count} | {due} |"
         for repo, title, state, open_count, due in milestone_rows
     )
-    lines.extend(["", "## Unassigned issue candidates", "", "Review these before assigning an owner.", "", "| Repository | Issue | Title |", "|---|---:|---|"])
+    lines.extend(
+        [
+            "",
+            "## Unassigned issue candidates",
+            "",
+            "Review these before assigning an owner.",
+            "",
+            "| Repository | Issue | Title |",
+            "|---|---:|---|",
+        ]
+    )
     lines.extend(
         f"| {markdown_escape(repo)} | [#{number}]({url}) | {markdown_escape(title)} |"
         for repo, number, title, url in unassigned_rows
     )
-    lines.extend(["", "## Stale issue candidates", "", f"Issues unchanged for at least {STALE_DAYS} days. This is a review queue, not an instruction to close them.", "", "| Repository | Issue | Last updated | Title |", "|---|---:|---|---|"])
+    lines.extend(
+        [
+            "",
+            "## Stale issue candidates",
+            "",
+            f"Issues unchanged for at least {STALE_DAYS} days. This is a review queue, not an instruction to close them.",
+            "",
+            "| Repository | Issue | Last updated | Title |",
+            "|---|---:|---|---|",
+        ]
+    )
     lines.extend(
         f"| {markdown_escape(repo)} | [#{number}]({url}) | {updated} | {markdown_escape(title)} |"
         for repo, number, title, updated, url in stale_rows
     )
-    lines.extend(["", "## Projects v2", "", "| Project | State | Last updated |", "|---|---|---|"])
+    lines.extend(
+        [
+            "",
+            "## Projects v2",
+            "",
+            "| Project | State | Last updated |",
+            "|---|---|---|",
+        ]
+    )
     lines.extend(
         f"| [{markdown_escape(project.get('title'))}]({project.get('url', '')}) | {'Closed' if project.get('closed') else 'Open'} | {str(project.get('updatedAt', ''))[:10]} |"
         for project in projects
     )
     if project_error:
-        lines.extend(["", f"> **Projects API warning:** {markdown_escape(project_error)}", "> Grant the token Projects read access to include this section."])
+        lines.extend(
+            [
+                "",
+                f"> **Projects API warning:** {markdown_escape(project_error)}",
+                "> Project totals are unavailable or incomplete; repository reporting continues.",
+            ]
+        )
     if errors:
         lines.extend(["", "## Repository errors", ""])
         lines.extend(f"- {markdown_escape(error)}" for error in errors)
-    lines.extend([
-        "",
-        "## Recommended follow-up",
-        "",
-        "1. Review unassigned issues and assign only when repository ownership or maintainer intent is clear.",
-        "2. Review stale issues; do not close automatically based only on age.",
-        "3. Add issues to an existing milestone when the target release is clear; create milestones only after confirming the release plan.",
-        "4. Review Project v2 items and status fields separately; this report lists projects but does not mutate project boards.",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Recommended follow-up",
+            "",
+            "1. Review unassigned issues and assign only when repository ownership or maintainer intent is clear.",
+            "2. Review stale issues; do not close automatically based only on age.",
+            "3. Add issues to an existing milestone when the target release is clear; create milestones only after confirming the release plan.",
+            "4. Review Project v2 items and status fields separately; this report lists projects but does not mutate project boards.",
+            "",
+        ]
+    )
     report = "\n".join(lines)
     print(report)
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")

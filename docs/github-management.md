@@ -20,7 +20,7 @@ If you use a classic personal access token instead, use the minimum scopes requi
 - Issues not updated for 30 days.
 - Issues without a milestone.
 - Milestone state, open issue count, and due date.
-- User-owned GitHub Projects v2 visible to the token.
+- User-owned GitHub Projects v2 visible to the token, following every page of results.
 
 The report is intentionally non-destructive. It does not assign issues, close stale issues, create milestones, move project cards, or edit status fields. It highlights candidates for direct AI-assisted review.
 
@@ -33,4 +33,8 @@ Use the connected GitHub integration in ChatGPT for supported issue updates, inc
 - The report lists user-owned Projects v2. It does not enumerate organization-owned projects or inspect each project's items/status fields.
 - A token that cannot access a private repository cannot report on that repository.
 - Repository API errors are included in the report and cause the workflow to fail so incomplete data is not presented as a clean run.
-- A missing Projects permission is reported as a warning; repository issue and milestone reporting continues.
+- A missing Projects permission, request failure, or invalid pagination response is reported as a warning; repository issue and milestone reporting continues. Previously fetched project pages remain visible, but the summary marks the count as incomplete or unavailable instead of presenting it as a complete total.
+
+## Development verification
+
+The token-free `Report tests` workflow checks project pagination and report completeness on Python 3.14. It uses mocked API responses and cannot make live network requests. Local test commands and test conventions are documented in [tests/AGENTS.md](../tests/AGENTS.md).
