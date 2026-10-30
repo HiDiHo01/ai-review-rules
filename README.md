@@ -4,6 +4,7 @@ Shared, reusable instructions for AI coding assistants and pull-request reviewer
 
 ## Files
 
+- `AI_POLICY.md`: authoritative AI contribution policy covering scope, authorization, privacy, evidence, and human responsibility.
 - `AGENTS.md`: general coding-agent rules.
 - `.github/copilot-instructions.md`: GitHub Copilot repository instructions.
 - `home-assistant.md`: additional standards for Home Assistant custom integrations.
