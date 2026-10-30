@@ -19,6 +19,16 @@ Apply these rules to all changes and pull-request reviews in this repository.
 - Do not treat formatting preferences or hypothetical concerns as bugs.
 - If there are no actionable findings, state that clearly.
 
+## When GitHub reports `rebaseable: false`
+
+Use this procedure when the user's task authorizes updating the pull-request branch. For a review-only request, report the issue without rewriting the branch.
+
+- Check `rebaseable` separately from `mergeable`: `mergeable: true` does not prove that GitHub can rebase the branch. Fetch the latest pull-request head and target branch before diagnosing the conflict.
+- Preserve the current head in a backup branch before rewriting history. Resolve conflicts by rebasing onto the current target branch, or rebuild the reviewed changes as linear commits on that target when merge history prevents rebasing. Merging the target into the pull-request branch alone is not sufficient evidence that rebasing works.
+- Inspect the resulting diff to preserve the reviewed changes and unrelated updates on the target branch. For a history-only rewrite with an unchanged target, verify that the new commit's file tree matches the previously tested tree exactly.
+- Update the branch with `git push --force-with-lease` or an API update guarded by the expected previous head SHA. If the head changed concurrently, fetch and reconcile those changes before retrying.
+- Run the applicable tests and CI checks and request a fresh review through the configured tooling. Before reporting the problem as resolved, fetch the pull request again and verify `rebaseable: true` for the exact final head SHA; report this separately from ordinary mergeability.
+
 ## Implementation standards
 - Follow the repository's existing architecture and conventions unless they are demonstrably unsafe or obsolete.
 - Prefer focused, maintainable changes over broad rewrites.
