@@ -1,5 +1,7 @@
 # AI Coding Agent Rules
 
+Read [AI_POLICY.md](AI_POLICY.md) before starting work. It governs authorization, security, privacy, evidence, and review integrity; this file contains the detailed working rules.
+
 ## General principles
 - Understand the existing architecture and conventions before making changes.
 - Prefer the smallest complete change that fixes the underlying problem.

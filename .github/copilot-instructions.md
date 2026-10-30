@@ -2,6 +2,8 @@
 
 Apply these rules to all changes and pull-request reviews in this repository.
 
+Read [AI_POLICY.md](../AI_POLICY.md) first and keep these instructions consistent with that policy and the applicable `AGENTS.md` files.
+
 ## Review priorities
 1. Correctness and regressions.
 2. Security, privacy, and secret handling.
