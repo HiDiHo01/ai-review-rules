@@ -23,7 +23,7 @@ jobs:
 
       - name: Generate report
         env:
-          GITHUB_MANAGEMENT_TOKEN: ${{ secrets.GITHUB_MANAGEMENT_TOKEN }}
+          GITHUB_MANAGEMENT_TOKEN: ${{ secrets.MANAGEMENT_TOKEN }}
           GITHUB_MANAGEMENT_OWNER: HiDiHo01
           GITHUB_MANAGEMENT_STALE_DAYS: "30"
         run: python3 scripts/github_management_report.py
