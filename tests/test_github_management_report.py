@@ -329,6 +329,12 @@ class FormattingAndResilienceTests(unittest.TestCase):
         self.assertEqual(
             report.markdown_escape("pipe|break\r\nline"), "pipe\\|break  line"
         )
+        self.assertEqual(
+            report.markdown_escape("pre\\|post"), "pre\\\\\\|post"
+        )
+        self.assertEqual(
+            report.markdown_escape("path\\name"), "path\\\\name"
+        )
 
     def test_main_handles_repo_with_null_owner(self) -> None:
         """Repositories with a null owner key must not raise AttributeError."""
@@ -351,10 +357,24 @@ class FormattingAndResilienceTests(unittest.TestCase):
 
     def test_missing_token_error_message_mentions_management_token(self) -> None:
         """Missing token error provides the valid secret name."""
-        with patch.object(report, "TOKEN", ""):
+        with patch.object(report, "TOKEN", ""), patch.object(
+            report, "_resolve_token", return_value=""
+        ):
             with self.assertRaises(report.GitHubApiError) as ctx:
                 report.github_request("/user/repos")
             self.assertIn("MANAGEMENT_TOKEN", str(ctx.exception))
+            self.assertIn("repository Actions secret", str(ctx.exception))
+
+    def test_whitespace_github_token_falls_back_to_management_token(self) -> None:
+        """Whitespace in GITHUB_MANAGEMENT_TOKEN falls back to MANAGEMENT_TOKEN."""
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_MANAGEMENT_TOKEN": "   \t\n  ",
+                "MANAGEMENT_TOKEN": "fallback-token",
+            },
+        ):
+            self.assertEqual(report._resolve_token(), "fallback-token")
 
 
 if __name__ == "__main__":
