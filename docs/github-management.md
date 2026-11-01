@@ -6,7 +6,7 @@ This repository provides a **read-only** portfolio report for owned `HiDiHo01` r
 
 1. Create a dedicated fine-grained personal access token restricted to the repositories you want included. Grant **Metadata: read**, **Issues: read**, and **Projects: read** where GitHub offers that permission. The token must be able to list the authenticated user's repositories and read issues and milestones.
 2. In this repository, open **Settings → Secrets and variables → Actions → New repository secret**.
-3. Name the secret `GITHUB_MANAGEMENT_TOKEN` and paste the token value.
+3. Name the secret `MANAGEMENT_TOKEN` and paste the token value (GitHub Actions reserves the `GITHUB_` prefix and rejects secret names starting with it).
 4. Run **Actions → GitHub portfolio management report → Run workflow**.
 5. Review the generated Markdown in the workflow run summary.
 

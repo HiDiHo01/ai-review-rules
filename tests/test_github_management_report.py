@@ -2,12 +2,17 @@
 
 import io
 import os
+import sys
 import unittest
 from contextlib import redirect_stdout
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from scripts import github_management_report as report
 
@@ -308,6 +313,48 @@ class ProjectPaginationTests(unittest.TestCase):
                 "/graphql",
             ],
         )
+
+
+
+class FormattingAndResilienceTests(unittest.TestCase):
+    """Test helper formatting and input edge cases."""
+
+    def test_markdown_escape_handles_none_numbers_and_booleans(self) -> None:
+        """Preserve zero and booleans without converting to empty strings."""
+        self.assertEqual(report.markdown_escape(None), "")
+        self.assertEqual(report.markdown_escape(""), "")
+        self.assertEqual(report.markdown_escape(0), "0")
+        self.assertEqual(report.markdown_escape(42), "42")
+        self.assertEqual(report.markdown_escape(False), "False")
+        self.assertEqual(
+            report.markdown_escape("pipe|break\r\nline"), "pipe\\|break  line"
+        )
+
+    def test_main_handles_repo_with_null_owner(self) -> None:
+        """Repositories with a null owner key must not raise AttributeError."""
+        repos = [
+            {
+                "full_name": "unknown/null-owner",
+                "owner": None,
+                "fork": False,
+                "archived": False,
+            },
+        ]
+        with (
+            patch.object(report, "TOKEN", "dummy-token"),
+            patch.object(report, "fetch_all_pages", return_value=repos),
+            patch.object(report, "fetch_projects", return_value=([], None)),
+            patch("sys.stdout", new_callable=io.StringIO),
+        ):
+            exit_code = report.main()
+        self.assertEqual(exit_code, 0)
+
+    def test_missing_token_error_message_mentions_management_token(self) -> None:
+        """Missing token error provides the valid secret name."""
+        with patch.object(report, "TOKEN", ""):
+            with self.assertRaises(report.GitHubApiError) as ctx:
+                report.github_request("/user/repos")
+            self.assertIn("MANAGEMENT_TOKEN", str(ctx.exception))
 
 
 if __name__ == "__main__":

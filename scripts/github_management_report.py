@@ -11,7 +11,11 @@ from urllib.request import Request, urlopen
 API_ROOT = "https://api.github.com"
 OWNER = os.environ.get("GITHUB_MANAGEMENT_OWNER", "HiDiHo01")
 STALE_DAYS = int(os.environ.get("GITHUB_MANAGEMENT_STALE_DAYS", "30"))
-TOKEN = os.environ.get("GITHUB_MANAGEMENT_TOKEN", "").strip()
+TOKEN = (
+    os.environ.get("GITHUB_MANAGEMENT_TOKEN")
+    or os.environ.get("MANAGEMENT_TOKEN")
+    or ""
+).strip()
 
 
 class GitHubApiError(RuntimeError):
@@ -28,7 +32,7 @@ def github_request(
     """Send an authenticated request to the GitHub REST or GraphQL API."""
     if not TOKEN:
         raise GitHubApiError(
-            "Missing GITHUB_MANAGEMENT_TOKEN. Add a read-only token as a repository Actions secret."
+            "Missing MANAGEMENT_TOKEN (or GITHUB_MANAGEMENT_TOKEN). Add a read-only token as a repository Actions secret."
         )
 
     url = f"{API_ROOT}{path}"
@@ -171,7 +175,8 @@ def fetch_projects() -> tuple[list[dict[str, object]], str | None]:
 
 def markdown_escape(value: object) -> str:
     """Escape pipe characters and line breaks for Markdown tables."""
-    return str(value or "").replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+    text = "" if value is None else str(value)
+    return text.replace("|", "\\|").replace("\r", " ").replace("\n", " ")
 
 
 def main() -> int:
@@ -188,7 +193,7 @@ def main() -> int:
     eligible_repos = [
         repo
         for repo in repos
-        if repo.get("owner", {}).get("login", "").casefold() == OWNER.casefold()
+        if (repo.get("owner") or {}).get("login", "").casefold() == OWNER.casefold()
         and not repo.get("fork", False)
         and not repo.get("archived", False)
     ]
