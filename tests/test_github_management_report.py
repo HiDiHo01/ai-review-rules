@@ -336,12 +336,30 @@ class FormattingAndResilienceTests(unittest.TestCase):
             report.markdown_escape("path\\name"), "path\\\\name"
         )
 
-    def test_main_handles_repo_with_null_owner(self) -> None:
-        """Repositories with a null owner key must not raise AttributeError."""
+    def test_main_handles_repo_with_malformed_owner(self) -> None:
+        """Repositories with null or malformed owner data must not raise exceptions."""
         repos = [
             {
                 "full_name": "unknown/null-owner",
                 "owner": None,
+                "fork": False,
+                "archived": False,
+            },
+            {
+                "full_name": "unknown/null-login",
+                "owner": {"login": None},
+                "fork": False,
+                "archived": False,
+            },
+            {
+                "full_name": "unknown/numeric-login",
+                "owner": {"login": 12345},
+                "fork": False,
+                "archived": False,
+            },
+            {
+                "full_name": "unknown/string-owner",
+                "owner": "not-a-dict",
                 "fork": False,
                 "archived": False,
             },
@@ -356,14 +374,17 @@ class FormattingAndResilienceTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
 
     def test_missing_token_error_message_mentions_management_token(self) -> None:
-        """Missing token error provides the valid secret name."""
+        """Missing token error provides the exact valid secret guidance."""
         with patch.object(report, "TOKEN", ""), patch.object(
             report, "_resolve_token", return_value=""
         ):
             with self.assertRaises(report.GitHubApiError) as ctx:
                 report.github_request("/user/repos")
-            self.assertIn("MANAGEMENT_TOKEN", str(ctx.exception))
-            self.assertIn("repository Actions secret", str(ctx.exception))
+            expected_message = (
+                "Missing MANAGEMENT_TOKEN. Add a read-only token as a repository Actions secret "
+                "(or set the MANAGEMENT_TOKEN or GITHUB_MANAGEMENT_TOKEN environment variable)."
+            )
+            self.assertEqual(str(ctx.exception), expected_message)
 
     def test_whitespace_github_token_falls_back_to_management_token(self) -> None:
         """Whitespace in GITHUB_MANAGEMENT_TOKEN falls back to MANAGEMENT_TOKEN."""

@@ -188,6 +188,15 @@ def markdown_escape(value: object) -> str:
     )
 
 
+def _repo_owner_matches(repo: dict[str, object], owner: str) -> bool:
+    """Validate that repository owner login is a string and matches target owner."""
+    owner_data = repo.get("owner")
+    if not isinstance(owner_data, dict):
+        return False
+    login = owner_data.get("login")
+    return isinstance(login, str) and login.casefold() == owner.casefold()
+
+
 def main() -> int:
     """Build a portfolio report without modifying GitHub resources."""
     try:
@@ -202,7 +211,7 @@ def main() -> int:
     eligible_repos = [
         repo
         for repo in repos
-        if (repo.get("owner") or {}).get("login", "").casefold() == OWNER.casefold()
+        if _repo_owner_matches(repo, OWNER)
         and not repo.get("fork", False)
         and not repo.get("archived", False)
     ]
