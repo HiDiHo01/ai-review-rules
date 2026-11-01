@@ -11,11 +11,15 @@ from urllib.request import Request, urlopen
 API_ROOT = "https://api.github.com"
 OWNER = os.environ.get("GITHUB_MANAGEMENT_OWNER", "HiDiHo01")
 STALE_DAYS = int(os.environ.get("GITHUB_MANAGEMENT_STALE_DAYS", "30"))
-TOKEN = (
-    os.environ.get("GITHUB_MANAGEMENT_TOKEN")
-    or os.environ.get("MANAGEMENT_TOKEN")
-    or ""
-).strip()
+def _resolve_token() -> str:
+    """Resolve and strip the management token from supported environment variables."""
+    return (
+        os.environ.get("GITHUB_MANAGEMENT_TOKEN", "").strip()
+        or os.environ.get("MANAGEMENT_TOKEN", "").strip()
+    )
+
+
+TOKEN = _resolve_token()
 
 
 class GitHubApiError(RuntimeError):
@@ -32,7 +36,7 @@ def github_request(
     """Send an authenticated request to the GitHub REST or GraphQL API."""
     if not TOKEN:
         raise GitHubApiError(
-            "Missing MANAGEMENT_TOKEN (or GITHUB_MANAGEMENT_TOKEN). Add a read-only token as a repository Actions secret."
+            "Missing MANAGEMENT_TOKEN. Add a read-only token as a repository Actions secret (or set the MANAGEMENT_TOKEN or GITHUB_MANAGEMENT_TOKEN environment variable)."
         )
 
     url = f"{API_ROOT}{path}"
@@ -174,9 +178,14 @@ def fetch_projects() -> tuple[list[dict[str, object]], str | None]:
 
 
 def markdown_escape(value: object) -> str:
-    """Escape pipe characters and line breaks for Markdown tables."""
+    """Escape backslashes, pipe characters, and line breaks for Markdown tables."""
     text = "" if value is None else str(value)
-    return text.replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+    return (
+        text.replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\r", " ")
+        .replace("\n", " ")
+    )
 
 
 def main() -> int:
