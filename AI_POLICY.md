@@ -51,6 +51,9 @@ Respect the adopting project's contribution requirements, licenses, and upstream
 - Keep required TLS, authentication, signature verification, input validation, and other security controls enabled. Do not disable them to work around errors or make checks pass.
 - Ordinary tests must be deterministic and avoid production credentials, live accounts, and real device writes. Live diagnostics and external changes must stay within the session's authorization and the project's requirements.
 - When sensitive data is discovered, limit further exposure and report the affected location through an authorized channel without reproducing the secret. Do not independently publish a security report or perform account actions outside the task.
+- **Confidential vulnerability disclosure overrides public issue tracking.** Treat suspected or confirmed, unpatched security vulnerabilities as confidential until disclosure is coordinated and authorized. Do not publish exploitable details, affected code paths, reproduction evidence, or revealing cross-references in public issues, PRs, reviews, commits, branch names, or CI artifacts, even if general issue-tracking guidance requires a public record.
+- When authorized, use a draft repository security advisory and its temporary private fork, or enabled private vulnerability reporting, to coordinate the fix. If unavailable, use an approved restricted tracker or secure maintainer channel; do not silently substitute public tracking. Respect authorization before initiating reports or other external actions.
+- Publicly disclose only when the maintainer authorizes coordinated disclosure, normally after a fix is released. No issue creation, public cross-reference, or advisory publication is automatic; any later public summary must be appropriately sanitized.
 
 ## 6. Dependencies, licensing, and provenance
 
