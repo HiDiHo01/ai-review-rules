@@ -35,6 +35,14 @@ Read [AI_POLICY.md](AI_POLICY.md) before starting work. It governs authorization
 - If no actionable issues are found, say so briefly.
 - Do not modify files, push commits, approve, or merge a pull request unless explicitly asked.
 
+## GitHub issue tracking for prioritized findings
+- **Create a dedicated GitHub issue for every newly confirmed P0, P1, P2, or P3 finding** when creating issues is authorized. A review comment or pull-request discussion is not a substitute for an issue.
+- Before creating an issue, search both open and closed issues for the same root cause. If one already exists, update or link to it instead of filing a duplicate. Track independent findings in separate issues.
+- Include the priority in the title (for example, `[P2]`), affected paths, observed versus expected behavior, impact, supporting evidence or reproduction, acceptance criteria, and a link to the originating review, PR, or CI check.
+- Cross-reference the issue in the originating review or PR when posting comments is authorized. Close it only after the fix and relevant checks are verified.
+- Follow `AI_POLICY.md` authorization requirements: **review-only access does not authorize publishing issues or comments**. In that case, report the proposed issue and its details without creating it until permission is given.
+- Never include secrets, identifying account data, or unsanitized logs in issues.
+
 ## When GitHub reports `rebaseable: false`
 
 Use this procedure when the user's task authorizes updating the pull-request branch. For a review-only request, report the issue without rewriting the branch.
