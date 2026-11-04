@@ -36,13 +36,17 @@ Read [AI_POLICY.md](AI_POLICY.md) before starting work. It governs authorization
 - Do not modify files, push commits, approve, or merge a pull request unless explicitly asked.
 
 ## GitHub issue tracking for prioritized findings
-- **Create a dedicated GitHub issue for every newly confirmed P0, P1, P2, or P3 finding** when creating issues is authorized. A review comment or pull-request discussion is not a substitute for an issue.
-- Before creating an issue, search both open and closed issues for the same root cause. If one already exists, update or link to it instead of filing a duplicate. Track independent findings in separate issues.
-- Include the priority in the title (for example, `[P2]`), affected paths, observed versus expected behavior, impact, supporting evidence or reproduction, acceptance criteria, and a link to the originating review, PR, or CI check.
-- Cross-reference the issue in the originating review or PR when posting comments is authorized. Close it only after the fix and relevant checks are verified.
-- Follow `AI_POLICY.md` authorization requirements: **review-only access does not authorize publishing issues or comments**. In that case, report the proposed issue and its details without creating it until permission is given.
+- **Check confidentiality before publication.** Treat suspected or confirmed, unpatched security vulnerabilities as confidential until the maintainer authorizes coordinated disclosure. This rule takes precedence over mandatory issue creation and review cross-references.
+- **For findings that are safe to disclose publicly**, create a dedicated GitHub issue for every newly confirmed P0, P1, P2, or P3 finding when issue creation is authorized. A review comment or pull-request discussion is not a substitute for an issue.
+- **Confidential vulnerability exception:** Never create a public issue or revealing public PR/review comment or cross-reference for an undisclosed, unpatched vulnerability. Do not publish affected code paths, exploit conditions, proof-of-concept or reproduction steps, logs, patches, branch names, or CI artifacts that would expose the vulnerability. A draft public PR is still public.
+- When authorized, track and remediate the vulnerability using a **draft GitHub Security Advisory** and, if appropriate, its temporary private fork. For outside reporters, use private vulnerability reporting when enabled. If these are unavailable, use an explicitly approved access-restricted tracker or secure maintainer channel; **never fall back to public issue creation**.
+- Restrict confidential details and the fix to approved participants and channels. Do not create a private advisory, publish a report, or perform external actions without the required authorization.
+- For publicly disclosable issues, search both open and closed issues for the same root cause before creation. Update or link to an existing issue instead of duplicating it; track independent findings separately.
+- For publicly disclosable issues, include the priority in the title (for example, `[P2]`), affected paths, observed versus expected behavior, impact, appropriate sanitized evidence, acceptance criteria, and a link to the originating review, PR, or CI check.
+- Cross-reference public issues in public reviews or PRs only when authorized **and safe to disclose**. Close issues only after the fix and relevant checks are verified.
+- After a security fix is available and the maintainer authorizes coordinated disclosure, publish only the approved advisory or sanitized public tracking information. A public GitHub issue or public cross-reference is **not mandatory** for a confidential security finding, even after remediation.
+- Follow `AI_POLICY.md` authorization requirements: **review-only access does not authorize publishing issues or comments**. In that case, propose the appropriate confidential or public tracking action without performing it.
 - Never include secrets, identifying account data, or unsanitized logs in issues.
-
 ## When GitHub reports `rebaseable: false`
 
 Use this procedure when the user's task authorizes updating the pull-request branch. For a review-only request, report the issue without rewriting the branch.
