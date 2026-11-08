@@ -45,7 +45,11 @@ def load_targets(path: Path) -> list[Target]:
         raise RuleSyncError("Rule-sync repositories must be a nonempty list.")
     targets: list[Target] = []
     for entry in entries:
-        if not isinstance(entry, str) or not re.fullmatch(r"HiDiHo01/[A-Za-z0-9_.-]+", entry):
+        if (
+            not isinstance(entry, str)
+            or not re.fullmatch(r"HiDiHo01/[A-Za-z0-9_.-]+", entry)
+            or entry.rsplit("/", 1)[-1] in {".", ".."}
+        ):
             raise RuleSyncError("Rule-sync targets must be explicitly owned HiDiHo01 repositories.")
         if any(target.repository == entry for target in targets):
             raise RuleSyncError("Duplicate rule-sync target repository: %s" % entry)

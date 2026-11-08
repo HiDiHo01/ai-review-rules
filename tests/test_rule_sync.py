@@ -75,7 +75,9 @@ class ConfigurationTests(unittest.TestCase):
         """Reject configs that could write to unintended repositories."""
         invalid = [[], {}, {"repositories": []}, {"repositories": ["other/repo"]},
                    {"repositories": ["HiDiHo01/repo", "HiDiHo01/repo"]},
-                   {"repositories": ["HiDiHo01/repo/../other"]}]
+                   {"repositories": ["HiDiHo01/repo/../other"]},
+                   {"repositories": ["HiDiHo01/.."]},
+                   {"repositories": ["HiDiHo01/."]}]
         with TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / "targets.json"
             for document in invalid:
