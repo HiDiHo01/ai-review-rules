@@ -48,6 +48,14 @@ Read [AI_POLICY.md](AI_POLICY.md) before starting work. It governs authorization
 - **Verify before closure:** Close a tracking issue only after the fix and relevant tests/checks have been verified, and do not treat a proposed patch as a completed fix.
 - **Honor authorization and privacy:** Review-only work does not authorize posting issues, PR comments, or security reports. In that case, report the proposed action without publishing it. Never include secrets, personal/account identifiers, or unsanitized logs in any issue or review.
 
+### Check for obsolete pull requests before resolving conflicts
+
+- Before resolving merge/rebase conflicts, rebasing, or rewriting a pull request, compare its complete changes against the **current** target branch. Inspect the PR diff, relevant code, tests, documentation, review feedback, and commit history.
+- Verify whether **all** meaningful functionality, bug fixes, regression coverage, and documentation changes are already present on the target branch with equivalent behavior. Similar code, a matching PR title, or a conflict flag alone is not sufficient evidence.
+- If the pull request is fully superseded, **do not resolve conflicts or merge duplicate changes**. When explicitly authorized to comment and close, post a concise explanation citing the replacement commit(s), relevant files, and existing tests; close the PR as obsolete **without merging**. For review-only tasks, recommend closure without changing the PR; never disclose confidential security details publicly.
+- If any meaningful change is missing or equivalence cannot be established, keep the PR open and resolve conflicts while preserving its unique changes. Run the relevant verification checks and report their actual results.
+- Document the disposition and any checks that were not run. Never claim an obsolete PR was merged, or that tests passed when they were not executed.
+
 ## When GitHub reports `rebaseable: false`
 
 Use this procedure when the user's task authorizes updating the pull-request branch. For a review-only request, report the issue without rewriting the branch.
