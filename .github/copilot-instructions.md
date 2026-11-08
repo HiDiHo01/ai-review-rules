@@ -21,12 +21,9 @@ Read [AI_POLICY.md](../AI_POLICY.md) first and keep these instructions consisten
 - Do not treat formatting preferences or hypothetical concerns as bugs.
 - If there are no actionable findings, state that clearly.
 
-## Check for obsolete pull requests before resolving conflicts
+## Obsolete pull-request classification
 
-- Compare the full PR diff, relevant code, tests, documentation, review feedback, and history against the **current** target branch before resolving conflicts or rewriting the PR branch.
-- Verify that **all** meaningful behavior and regression coverage are present with equivalent results; similar patches or a conflict flag do not establish that the PR is obsolete.
-- If fully superseded, do not merge duplicate changes or repair unnecessary conflicts. When authorized, cite the replacement commits and tests in a PR comment and close it **without merging**. For review-only tasks, recommend closure without making changes; never publish confidential security details.
-- Otherwise keep the PR open, preserve any unique changes through conflict resolution, and run the relevant checks. Report precisely what was verified, including checks not run.
+Follow the canonical managed obsolete-PR triage rule in [AGENTS.md](../AGENTS.md), including its four evidence-based outcomes. Keep PRs open when equivalence has not been verified; never close or merge without authorization.
 
 ## When GitHub reports `rebaseable: false`
 

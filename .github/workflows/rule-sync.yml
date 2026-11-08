@@ -1,0 +1,39 @@
+name: Shared rule drift and update PRs
+
+on:
+  schedule:
+    - cron: "23 7 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-rule-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Check managed rules and propose review PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out central rules
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Check drift and propose update PRs when authorized
+        env:
+          RULE_SYNC_TOKEN: ${{ secrets.RULE_SYNC_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$RULE_SYNC_TOKEN" ]; then
+            python scripts/rule_sync.py --mode propose
+          else
+            echo "RULE_SYNC_TOKEN is not configured; running read-only drift check."
+            python scripts/rule_sync.py --mode check
+          fi
