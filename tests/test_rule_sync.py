@@ -109,7 +109,13 @@ class GitHubBehaviorTests(unittest.TestCase):
     def test_existing_pr_prevents_duplicate_writes(self) -> None:
         """Do not push when a sync PR already awaits human review."""
         client = rule_sync.GitHubClient("example-token")
-        with patch.object(client, "request", return_value=[{"html_url": "https://github.com/example/pull/1"}]) as mocked:
+        pending = {
+            "html_url": "https://github.com/example/pull/1",
+            "head": {"repo": {"full_name": "HiDiHo01/demo"},
+                     "ref": rule_sync.BRANCH_PREFIX + "oldversion"},
+            "base": {"ref": "main"},
+        }
+        with patch.object(client, "request", return_value=[pending]) as mocked:
             result = client.open_sync_pr(rule_sync.Target("HiDiHo01/demo"), "main", "a" * 40, "b" * 40, "hello")
         self.assertEqual(result, "existing PR: https://github.com/example/pull/1")
         self.assertEqual(mocked.call_count, 1)
@@ -128,7 +134,7 @@ class GitHubBehaviorTests(unittest.TestCase):
         client = rule_sync.GitHubClient()
         def fake_request(method: str, endpoint: str, payload: dict[str, object] | None = None) -> object:
             """Provide synthetic API answers for one clean proposal."""
-            if method == "GET" and endpoint.endswith("/pulls?state=open&head=HiDiHo01%3Aautomation%2Fsync-obsolete-pr-triage&base=main"):
+            if method == "GET" and "/pulls?state=open&per_page=100&page=1" in endpoint:
                 return []
             if method == "GET":
                 raise rule_sync.RuleSyncError("GitHub resource not found (HTTP 404).")
@@ -144,6 +150,60 @@ class GitHubBehaviorTests(unittest.TestCase):
         self.assertEqual(base64.b64decode(calls[3].args[2]["content"]), b"# Example")
         self.assertEqual(calls[3].args[2]["sha"], "b" * 40)
         self.assertNotIn("merge", calls[4].args[2])
+
+    def test_ignores_unrelated_prs_including_forked_branches(self) -> None:
+        """Never mistake a similarly named branch in another repository for an update."""
+        client = rule_sync.GitHubClient()
+        unrelated = {
+            "html_url": "https://github.com/HiDiHo01/demo/pull/2",
+            "head": {"ref": rule_sync.BRANCH_PREFIX + "abc", "repo": {"full_name": "other/fork"}},
+            "base": {"ref": "main"},
+        }
+        with patch.object(client, "request", return_value=[unrelated]) as mocked:
+            self.assertIsNone(client._existing_sync_pr(rule_sync.Target("HiDiHo01/demo"), "main"))
+        mocked.assert_called_once()
+
+    def test_paginates_past_one_hundred_open_prs(self) -> None:
+        """Check subsequent pages to avoid creating duplicate PRs in busy repositories."""
+        unrelated = {
+            "html_url": "https://github.com/example/pull/2",
+            "head": {"ref": "feature/foo", "repo": {"full_name": "HiDiHo01/demo"}},
+            "base": {"ref": "main"},
+        }
+        pending = {
+            "html_url": "https://github.com/example/pull/123",
+            "head": {"ref": rule_sync.BRANCH_PREFIX + "123", "repo": {"full_name": "HiDiHo01/demo"}},
+            "base": {"ref": "main"},
+        }
+        client = rule_sync.GitHubClient()
+        with patch.object(client, "request", side_effect=[[unrelated] * 100, [pending]]) as mocked:
+            self.assertEqual(
+                client._existing_sync_pr(rule_sync.Target("HiDiHo01/demo"), "main"),
+                "https://github.com/example/pull/123",
+            )
+        self.assertEqual(mocked.call_count, 2)
+        self.assertIn("page=2", mocked.call_args_list[-1].args[1])
+
+    def test_new_base_commit_changes_proposal_branch_name(self) -> None:
+        """Future sync revisions receive unique branches without force pushes."""
+        client = rule_sync.GitHubClient()
+        def fake_request(method: str, endpoint: str, payload: dict[str, object] | None = None) -> object:
+            """Return synthetic, successful proposal responses."""
+            if method == "GET" and "/pulls?" in endpoint:
+                return []
+            if method == "GET":
+                raise rule_sync.RuleSyncError("GitHub resource not found (HTTP 404).")
+            if method == "POST" and endpoint.endswith("/pulls"):
+                return {"html_url": "https://github.com/example/pull/2"}
+            return {}
+        branches = []
+        for sha in ("a" * 40, "b" * 40):
+            with patch.object(client, "request", side_effect=fake_request) as mocked:
+                client.open_sync_pr(rule_sync.Target("HiDiHo01/demo"), "main", sha, "c" * 40, "hello")
+            branch = mocked.call_args_list[2].args[2]["ref"]
+            self.assertTrue(branch.startswith("refs/heads/" + rule_sync.BRANCH_PREFIX))
+            branches.append(branch)
+        self.assertNotEqual(branches[0], branches[1])
 
     def test_missing_write_token_never_reaches_network(self) -> None:
         """Require opt-in credentials before any proposal is attempted."""

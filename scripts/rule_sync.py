@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
@@ -16,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 START = "<!-- ai-review-rules:obsolete-pr-triage:start -->"
 END = "<!-- ai-review-rules:obsolete-pr-triage:end -->"
 LEGACY_HEADING = "### Check for obsolete pull requests before resolving conflicts"
-BRANCH = "automation/sync-obsolete-pr-triage"
+BRANCH_PREFIX = "automation/sync-obsolete-pr-triage-"
 GITHUB_API = "https://api.github.com"
 
 
@@ -152,17 +153,44 @@ class GitHubClient:
             raise RuleSyncError("GitHub file content is not valid UTF-8 base64.") from err
         return decoded, sha
 
+    def _existing_sync_pr(self, target: Target, base: str) -> str | None:
+        """Find any pending sync PR, including those from earlier rule revisions."""
+        for page in range(1, 101):
+            endpoint = "/repos/%s/pulls?%s" % (target.repository, urlencode({
+                "state": "open", "per_page": 100, "page": page,
+            }))
+            pull_requests = self.request("GET", endpoint)
+            if not isinstance(pull_requests, list):
+                raise RuleSyncError("GitHub pull-request listing is invalid.")
+            for pull_request in pull_requests:
+                if not isinstance(pull_request, dict):
+                    raise RuleSyncError("GitHub pull-request record is invalid.")
+                head = pull_request.get("head")
+                target_base = pull_request.get("base")
+                if not isinstance(head, dict) or not isinstance(target_base, dict):
+                    raise RuleSyncError("GitHub pull-request branch metadata is invalid.")
+                head_repo = head.get("repo")
+                if (
+                    isinstance(head_repo, dict)
+                    and head_repo.get("full_name") == target.repository
+                    and isinstance(head.get("ref"), str)
+                    and head["ref"].startswith(BRANCH_PREFIX)
+                    and target_base.get("ref") == base
+                ):
+                    url = pull_request.get("html_url")
+                    return str(url or "unknown")
+            if len(pull_requests) < 100:
+                return None
+        raise RuleSyncError("Too many pull requests to verify duplicates safely.")
+
     def open_sync_pr(self, target: Target, base: str, base_sha: str, old_sha: str, content: str) -> str:
         """Create one update PR; never change existing PR branches or merge."""
-        existing = self.request("GET", "/repos/%s/pulls?%s" % (target.repository, urlencode({
-            "state": "open", "head": "HiDiHo01:" + BRANCH, "base": base,
-        })))
-        if not isinstance(existing, list):
-            raise RuleSyncError("GitHub pull-request listing is invalid.")
-        if existing:
-            url = existing[0].get("html_url") if isinstance(existing[0], dict) else None
-            return "existing PR: " + str(url or "unknown")
-        branch_endpoint = "/repos/%s/git/ref/heads/%s" % (target.repository, quote(BRANCH, safe="/"))
+        existing_url = self._existing_sync_pr(target, base)
+        if existing_url is not None:
+            return "existing PR: " + existing_url
+        content_digest = hashlib.sha256((base_sha + content).encode("utf-8")).hexdigest()[:12]
+        branch = BRANCH_PREFIX + content_digest
+        branch_endpoint = "/repos/%s/git/ref/heads/%s" % (target.repository, quote(branch, safe="/"))
         try:
             self.request("GET", branch_endpoint)
         except RuleSyncError as err:
@@ -171,16 +199,16 @@ class GitHubClient:
         else:
             raise RuleSyncError("Sync branch already exists without an open PR; manual review needed.")
         self.request("POST", "/repos/%s/git/refs" % target.repository, {
-            "ref": "refs/heads/" + BRANCH, "sha": base_sha,
+            "ref": "refs/heads/" + branch, "sha": base_sha,
         })
         encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
         self.request("PUT", "/repos/%s/contents/%s" % (target.repository, target.path), {
             "message": "docs: sync shared obsolete-PR triage rule",
-            "content": encoded, "sha": old_sha, "branch": BRANCH,
+            "content": encoded, "sha": old_sha, "branch": branch,
         })
         response = self.request("POST", "/repos/%s/pulls" % target.repository, {
             "title": "docs: sync shared obsolete-PR triage rule",
-            "head": BRANCH, "base": base,
+            "head": branch, "base": base,
             "body": ("Synchronize only the managed obsolete-PR triage rule from "
                      "[ai-review-rules](https://github.com/HiDiHo01/ai-review-rules/blob/main/rules/obsolete-pr-triage.md). "
                      "Preserve repository-specific instructions. Requires human review; no auto-merge or auto-close."),

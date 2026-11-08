@@ -33,7 +33,7 @@ The scheduled [rule-sync workflow](../.github/workflows/rule-sync.yml) runs ever
 
 To enable update proposals, configure an Actions secret named **`RULE_SYNC_TOKEN`** in `ai-review-rules` with a fine-grained token restricted to the opted-in repositories and permissions **Contents: read/write**, **Pull requests: read/write**, and **Metadata: read**. Keep it out of logs, commits, and fixtures. Rotate and revoke it when appropriate.
 
-With a token, each unsynchronized repository gets at most one open PR on branch `automation/sync-obsolete-pr-triage`. Existing PRs are left for human review; an orphan branch requires manual intervention rather than a force push. A newer central rule is not pushed onto an existing PR branch without review. Nothing auto-merges, closes PRs, deletes branches, or rewrites history.
+With a token, each unsynchronized repository gets at most one open PR on a versioned branch named `automation/sync-obsolete-pr-triage-<digest>` (derived from the target base SHA and proposed content). All open sync PRs are checked across pages before proposing changes. Pending PRs are left for human review; an orphan branch requires manual intervention rather than a force push. Once a PR is merged, later updates use a new branch. Nothing auto-merges, closes PRs, deletes branches, or rewrites history.
 
 Run locally with Python 3.14:
 
